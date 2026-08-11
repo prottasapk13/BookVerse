@@ -1,6 +1,7 @@
-function Hero() {
+function Hero({ searchTerm, setSearchTerm }) {
   return (
     <section className="container text-center py-5">
+
       <h1 className="display-4 fw-bold">
         Discover Your Next Favorite Book
       </h1>
@@ -9,9 +10,30 @@ function Hero() {
         Browse thousands of books from different categories and find the perfect read for you.
       </p>
 
-      <button className="btn btn-primary btn-lg mt-3">
+      <div className="row justify-content-center mt-4">
+        <div className="col-md-7">
+          <div className="input-group input-group-lg">
+
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Search books by title..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+
+            <button className="btn btn-primary">
+              Search
+            </button>
+
+          </div>
+        </div>
+      </div>
+
+      <button className="btn btn-primary btn-lg mt-4">
         Explore Books
       </button>
+
     </section>
   );
 }

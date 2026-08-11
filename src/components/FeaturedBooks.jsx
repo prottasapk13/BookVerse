@@ -1,77 +1,76 @@
-function FeaturedBooks() {
+const books = [
+  {
+    title: "Atomic Habits",
+    description: "Learn how small habits create big changes.",
+    image: "https://picsum.photos/300/400?random=1",
+  },
+  {
+    title: "Clean Code",
+    description: "A guide to writing better software.",
+    image: "https://picsum.photos/300/400?random=2",
+  },
+  {
+    title: "The Alchemist",
+    description: "A timeless story about dreams and destiny.",
+    image: "https://picsum.photos/300/400?random=3",
+  },
+];
+
+function FeaturedBooks({ searchTerm }) {
+
+  const filteredBooks = books.filter((book) =>
+    book.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <section className="container my-5">
-      <h2 className="text-center mb-4">Featured Books</h2>
+
+      <h2 className="text-center mb-4">
+        Featured Books
+      </h2>
 
       <div className="row">
 
-        <div className="col-md-4">
-          <div className="card shadow-sm">
-            <img
-              src="https://picsum.photos/300/400?random=1"
-              className="card-img-top"
-              alt="Book"
-            />
+        {filteredBooks.map((book) => (
+          <div className="col-md-4 mb-4" key={book.title}>
 
-            <div className="card-body">
-              <h5 className="card-title">Atomic Habits</h5>
+            <div className="card shadow-sm">
 
-              <p className="card-text">
-                Learn how small habits create big changes.
-              </p>
+              <img
+                src={book.image}
+                className="card-img-top"
+                alt={book.title}
+              />
 
-              <button className="btn btn-primary">
-                View Details
-              </button>
+              <div className="card-body">
+
+                <h5 className="card-title">
+                  {book.title}
+                </h5>
+
+                <p className="card-text">
+                  {book.description}
+                </p>
+
+                <button className="btn btn-primary">
+                  View Details
+                </button>
+
+              </div>
+
             </div>
+
           </div>
-        </div>
-
-        <div className="col-md-4">
-          <div className="card shadow-sm">
-            <img
-              src="https://picsum.photos/300/400?random=2"
-              className="card-img-top"
-              alt="Book"
-            />
-
-            <div className="card-body">
-              <h5 className="card-title">Clean Code</h5>
-
-              <p className="card-text">
-                A guide to writing better software.
-              </p>
-
-              <button className="btn btn-primary">
-                View Details
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-md-4">
-          <div className="card shadow-sm">
-            <img
-              src="https://picsum.photos/300/400?random=3"
-              className="card-img-top"
-              alt="Book"
-            />
-
-            <div className="card-body">
-              <h5 className="card-title">The Alchemist</h5>
-
-              <p className="card-text">
-                A timeless story about dreams and destiny.
-              </p>
-
-              <button className="btn btn-primary">
-                View Details
-              </button>
-            </div>
-          </div>
-        </div>
+        ))}
 
       </div>
+
+      {filteredBooks.length === 0 && (
+        <p className="text-center text-muted">
+          No books found.
+        </p>
+      )}
+
     </section>
   );
 }
