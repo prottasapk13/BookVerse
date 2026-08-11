@@ -1,29 +1,36 @@
+import { Link } from "react-router-dom";
+
 function Navbar() {
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
       <div className="container">
 
-        <a className="navbar-brand fw-bold" href="#">
+        <Link className="navbar-brand fw-bold" to="/">
           📚 BookVerse
-        </a>
+        </Link>
 
         <div className="ms-auto">
 
-          <a className="btn btn-outline-light me-2" href="#">
+          <Link className="btn btn-outline-light me-2" to="/">
             Home
-          </a>
+          </Link>
 
-          <a className="btn btn-outline-light me-2" href="#">
+          <Link className="btn btn-outline-light me-2" to="/books">
             Books
-          </a>
+          </Link>
 
-          <a className="btn btn-outline-light me-2" href="#">
+          <Link className="btn btn-outline-light me-2" to="/categories">
             Categories
-          </a>
+          </Link>
 
-          <a className="btn btn-warning" href="#">
+          <Link className="btn btn-outline-light me-2" to="/cart">
+           Cart
+          </Link>
+  
+
+          <Link className="btn btn-warning" to="/login">
             Login
-          </a>
+          </Link>
 
         </div>
 
