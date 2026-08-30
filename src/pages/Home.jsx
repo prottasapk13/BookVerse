@@ -1,4 +1,5 @@
 import Hero from "../components/Hero";
+import Categories from "../components/Categories";
 import FeaturedBooks from "../components/FeaturedBooks";
 
 function Home({ searchTerm, setSearchTerm }) {
@@ -8,6 +9,8 @@ function Home({ searchTerm, setSearchTerm }) {
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
       />
+
+      <Categories />
 
       <FeaturedBooks searchTerm={searchTerm} />
     </>

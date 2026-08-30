@@ -1,4 +1,64 @@
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+
 function Login() {
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+
+  const [message, setMessage] = useState("");
+
+  const navigate = useNavigate();
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      const response = await fetch(
+        "http://localhost:5000/api/auth/login",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(formData),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        localStorage.setItem("token", data.token);
+
+        localStorage.setItem(
+          "user",
+          JSON.stringify(data.user)
+        );
+
+        // Update Navbar immediately
+        window.dispatchEvent(new Event("authChange"));
+
+        setMessage("Login successful!");
+
+        // Go to Home
+        navigate("/");
+      } else {
+        setMessage(data.message || "Login failed");
+      }
+    } catch (error) {
+      console.error("LOGIN ERROR:", error);
+      setMessage("Unable to connect to server");
+    }
+  };
+
   return (
     <div className="container py-5">
       <div className="row justify-content-center">
@@ -11,7 +71,13 @@ function Login() {
                 Login to BookVerse
               </h2>
 
-              <form>
+              {message && (
+                <div className="alert alert-info">
+                  {message}
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit}>
 
                 <div className="mb-3">
                   <label className="form-label">
@@ -20,8 +86,12 @@ function Login() {
 
                   <input
                     type="email"
+                    name="email"
                     className="form-control"
                     placeholder="Enter your email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
                   />
                 </div>
 
@@ -32,8 +102,12 @@ function Login() {
 
                   <input
                     type="password"
+                    name="password"
                     className="form-control"
                     placeholder="Enter your password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
                   />
                 </div>
 
@@ -48,9 +122,10 @@ function Login() {
 
               <p className="text-center mt-3">
                 Don't have an account?{" "}
-                <a href="/register">
+
+                <Link to="/register">
                   Register
-                </a>
+                </Link>
               </p>
 
             </div>

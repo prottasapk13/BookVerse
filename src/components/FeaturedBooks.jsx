@@ -1,26 +1,40 @@
-const books = [
-  {
-    title: "Atomic Habits",
-    description: "Learn how small habits create big changes.",
-    image: "https://picsum.photos/300/400?random=1",
-  },
-  {
-    title: "Clean Code",
-    description: "A guide to writing better software.",
-    image: "https://picsum.photos/300/400?random=2",
-  },
-  {
-    title: "The Alchemist",
-    description: "A timeless story about dreams and destiny.",
-    image: "https://picsum.photos/300/400?random=3",
-  },
-];
+import { useEffect, useState } from "react";
 
-function FeaturedBooks({ searchTerm }) {
+function FeaturedBooks() {
+  const [books, setBooks] = useState([]);
+  const [search, setSearch] = useState("");
 
-  const filteredBooks = books.filter((book) =>
-    book.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    const fetchBooks = async () => {
+      try {
+        const response = await fetch(
+          "http://localhost:5000/api/books"
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch books");
+        }
+
+        const data = await response.json();
+
+        setBooks(data);
+      } catch (error) {
+        console.error("FEATURED BOOKS ERROR:", error);
+      }
+    };
+
+    fetchBooks();
+  }, []);
+
+  const filteredBooks = books.filter((book) => {
+    const title = book.title || "";
+    const author = book.author || "";
+
+    return (
+      title.toLowerCase().includes(search.toLowerCase()) ||
+      author.toLowerCase().includes(search.toLowerCase())
+    );
+  });
 
   return (
     <section className="container my-5">
@@ -29,48 +43,82 @@ function FeaturedBooks({ searchTerm }) {
         Featured Books
       </h2>
 
-      <div className="row">
+      {/* Search */}
+      <div className="row justify-content-center mb-4">
+        <div className="col-md-7">
+          <div className="input-group">
+            <input
+              type="text"
+              className="form-control"
+              placeholder="Search books by title or author..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
 
-        {filteredBooks.map((book) => (
-          <div className="col-md-4 mb-4" key={book.title}>
-
-            <div className="card shadow-sm">
-
-              <img
-                src={book.image}
-                className="card-img-top"
-                alt={book.title}
-              />
-
-              <div className="card-body">
-
-                <h5 className="card-title">
-                  {book.title}
-                </h5>
-
-                <p className="card-text">
-                  {book.description}
-                </p>
-
-                <button className="btn btn-primary">
-                  View Details
-                </button>
-
-              </div>
-
-            </div>
-
+            <button className="btn btn-primary">
+              Search
+            </button>
           </div>
-        ))}
-
+        </div>
       </div>
 
-      {filteredBooks.length === 0 && (
-        <p className="text-center text-muted">
-          No books found.
-        </p>
-      )}
+      <div className="row">
 
+        {filteredBooks.length === 0 ? (
+          <div className="text-center">
+            <p>No books found.</p>
+          </div>
+        ) : (
+          filteredBooks.slice(0, 3).map((book) => (
+            <div
+              className="col-md-4 mb-4"
+              key={book._id}
+            >
+              <div className="card h-100 shadow-sm">
+
+                <img
+                  src={
+                    book.image ||
+                    "https://picsum.photos/300/400"
+                  }
+                  className="card-img-top"
+                  alt={book.title || "Book"}
+                  style={{
+                    height: "350px",
+                    objectFit: "cover",
+                  }}
+                />
+
+                <div className="card-body">
+
+                  <h5 className="card-title">
+                    {book.title || "Untitled Book"}
+                  </h5>
+
+                  <p className="text-muted">
+                    by {book.author || "Unknown Author"}
+                  </p>
+
+                  <p className="card-text">
+                    {book.description ||
+                      "No description available."}
+                  </p>
+
+                  <p className="fw-bold text-primary">
+                    ৳{book.price ?? 0}
+                  </p>
+
+                  <button className="btn btn-primary">
+                    View Details
+                  </button>
+
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+
+      </div>
     </section>
   );
 }
