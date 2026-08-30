@@ -8,7 +8,7 @@ function Categories() {
     const fetchCategories = async () => {
       try {
         const response = await fetch(
-          "http://localhost:5000/api/admin/public-categories"
+          "https://bookverse-backend-hy7j.onrender.com/api/admin/public-categories"
         );
 
         if (!response.ok) {

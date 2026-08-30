@@ -5,7 +5,7 @@ function Categories() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/admin/public-categories")
+    fetch("https://bookverse-backend-hy7j.onrender.com/api/admin/public-categories")
       .then((response) => {
         if (!response.ok) {
           throw new Error("Failed to fetch categories");
@@ -47,3 +47,4 @@ function Categories() {
 }
 
 export default Categories;
+

@@ -25,7 +25,7 @@ function Books() {
 
   // Load books
   useEffect(() => {
-    fetch("http://localhost:5000/api/books")
+    fetch("https://bookverse-backend-hy7j.onrender.com/api/books")
       .then((response) => {
         if (!response.ok) {
           throw new Error("Failed to load books");

@@ -34,7 +34,7 @@ function AdminDashboard() {
   const fetchBooks = async () => {
     try {
       const response = await fetch(
-        "http://localhost:5000/api/books"
+        "https://bookverse-backend-hy7j.onrender.com/api/books"
       );
 
       const data = await response.json();
@@ -57,7 +57,7 @@ function AdminDashboard() {
   const fetchOrders = async () => {
     try {
       const response = await fetch(
-        "http://localhost:5000/api/orders",
+        "https://bookverse-backend-hy7j.onrender.com/api/orders",
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -86,7 +86,7 @@ function AdminDashboard() {
   const fetchUsers = async () => {
     try {
       const response = await fetch(
-        "http://localhost:5000/api/admin/users",
+        "https://bookverse-backend-hy7j.onrender.com/api/admin/users",
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -146,8 +146,8 @@ function AdminDashboard() {
 
     try {
       const url = editingId
-        ? `http://localhost:5000/api/books/${editingId}`
-        : "http://localhost:5000/api/books";
+        ? `https://bookverse-backend-hy7j.onrender.com/api/books/${editingId}`
+        : "https://bookverse-backend-hy7j.onrender.com/api/books";
 
       const method = editingId ? "PUT" : "POST";
 
@@ -226,7 +226,7 @@ function AdminDashboard() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/books/${id}`,
+        `https://bookverse-backend-hy7j.onrender.com/api/books/${id}`,
         {
           method: "DELETE",
           headers: authHeaders,
@@ -258,7 +258,7 @@ function AdminDashboard() {
   const handleOrderStatus = async (id, status) => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/orders/${id}`,
+        `https://bookverse-backend-hy7j.onrender.com/api/orders/${id}`,
         {
           method: "PUT",
           headers: authHeaders,
@@ -293,7 +293,7 @@ function AdminDashboard() {
   const handleUserRole = async (id, role) => {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/admin/users/${id}`,
+        `https://bookverse-backend-hy7j.onrender.com/api/admin/users/${id}`,
         {
           method: "PUT",
           headers: authHeaders,
@@ -336,7 +336,7 @@ function AdminDashboard() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/admin/users/${id}`,
+        `https://bookverse-backend-hy7j.onrender.com/api/admin/users/${id}`,
         {
           method: "DELETE",
           headers: authHeaders,
