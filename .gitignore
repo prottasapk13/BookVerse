@@ -23,3 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 server/.env
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+server/.env
+server/.env.*
+!server/.env.example
