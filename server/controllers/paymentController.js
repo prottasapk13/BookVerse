@@ -3,42 +3,53 @@ const mongoose = require("mongoose");
 const Order = require("../models/Order");
 const Book = require("../models/Book");
 
-// SSLCOMMERZ sandbox validation endpoint
-const VALIDATION_URL =
-  "https://sandbox.sslcommerz.com/validator/api/validationserverAPI.php";
+const AAMARPAY_BASE_URL =
+  process.env.AAMARPAY_BASE_URL || "https://sandbox.aamarpay.com";
 
-// Verify a transaction directly with SSLCOMMERZ
-const validateTransaction = async (valId, order) => {
-  if (!valId) {
-    throw new Error("Payment validation ID is missing.");
-  }
+const AAMARPAY_PAYMENT_URL = `${AAMARPAY_BASE_URL}/jsonpost.php`;
 
+const AAMARPAY_VERIFY_URL = `${AAMARPAY_BASE_URL}/api/v1/trxcheck/request.php`;
+
+// Verify payment directly with aamarPay.
+const validateTransaction = async (transactionId, order) => {
   const params = new URLSearchParams({
-    val_id: valId,
-    store_id: process.env.SSLCOMMERZ_STORE_ID,
-    store_passwd: process.env.SSLCOMMERZ_STORE_PASSWORD,
-    format: "json",
+    request_id: transactionId,
+    store_id: process.env.AAMARPAY_STORE_ID,
+    signature_key: process.env.AAMARPAY_SIGNATURE_KEY,
+    type: "json",
   });
 
-  const response = await fetch(`${VALIDATION_URL}?${params.toString()}`);
+  const response = await fetch(`${AAMARPAY_VERIFY_URL}?${params}`);
 
   if (!response.ok) {
-    throw new Error("Could not contact the payment validation service.");
+    throw new Error("Could not contact aamarPay verification service.");
   }
 
   const result = await response.json();
 
-  const validStatus = ["VALID", "VALIDATED"].includes(result.status);
-  const matchingTransaction = result.tran_id === order.transactionId;
+  const validStatus =
+    String(result.status_code) === "2" &&
+    String(result.pay_status).toLowerCase() === "successful";
+
+  const matchingTransaction = result.mer_txnid === order.transactionId;
+
+  const paidAmount = Number(result.amount_bdt || result.amount);
   const matchingAmount =
-    Number(result.amount).toFixed(2) === Number(order.totalAmount).toFixed(2);
-  const matchingCurrency = result.currency === "BDT";
+    Number.isFinite(paidAmount) &&
+    paidAmount.toFixed(2) === Number(order.totalAmount).toFixed(2);
+
+  const matchingCurrency =
+    (result.currency || result.currency_merchant) === "BDT";
+
+  const matchingStore =
+    result.store_id === process.env.AAMARPAY_STORE_ID;
 
   if (
     !validStatus ||
     !matchingTransaction ||
     !matchingAmount ||
-    !matchingCurrency
+    !matchingCurrency ||
+    !matchingStore
   ) {
     throw new Error("Payment verification failed.");
   }
@@ -46,8 +57,7 @@ const validateTransaction = async (valId, order) => {
   return result;
 };
 
-// Mark an order as paid and reduce its book stock.
-// This function is safe to call more than once for the same transaction.
+// Mark order as paid and reduce stock only once.
 const completePaidOrder = async (orderId) => {
   const session = await mongoose.startSession();
 
@@ -61,7 +71,6 @@ const completePaidOrder = async (orderId) => {
         throw new Error("Order not found.");
       }
 
-      // Prevent duplicate callbacks from reducing stock again.
       if (order.paymentStatus === "Paid") {
         completedOrder = order;
         return;
@@ -71,7 +80,6 @@ const completePaidOrder = async (orderId) => {
         throw new Error("This order is not awaiting payment.");
       }
 
-      // Reduce stock only after payment has been verified.
       for (const item of order.items) {
         const stockUpdate = await Book.updateOne(
           {
@@ -85,9 +93,7 @@ const completePaidOrder = async (orderId) => {
         );
 
         if (stockUpdate.modifiedCount !== 1) {
-          throw new Error(
-            `Not enough stock available for ${item.title}.`
-          );
+          throw new Error(`Not enough stock for ${item.title}.`);
         }
       }
 
@@ -95,7 +101,6 @@ const completePaidOrder = async (orderId) => {
       order.status = "Pending";
 
       await order.save({ session });
-
       completedOrder = order;
     });
 
@@ -105,7 +110,7 @@ const completePaidOrder = async (orderId) => {
   }
 };
 
-// Create a payment session
+// Initiate aamarPay payment.
 const initiatePayment = async (req, res) => {
   let order;
 
@@ -113,9 +118,7 @@ const initiatePayment = async (req, res) => {
     const { items, phone, address, city, postcode } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({
-        message: "Your cart is empty.",
-      });
+      return res.status(400).json({ message: "Your cart is empty." });
     }
 
     if (!phone || !/^[0-9]{11}$/.test(phone.trim())) {
@@ -131,11 +134,11 @@ const initiatePayment = async (req, res) => {
     }
 
     if (
-      !process.env.SSLCOMMERZ_STORE_ID ||
-      !process.env.SSLCOMMERZ_STORE_PASSWORD
+      !process.env.AAMARPAY_STORE_ID ||
+      !process.env.AAMARPAY_SIGNATURE_KEY
     ) {
       return res.status(500).json({
-        message: "Payment gateway credentials are missing.",
+        message: "aamarPay credentials are missing.",
       });
     }
 
@@ -144,27 +147,22 @@ const initiatePayment = async (req, res) => {
 
     if (!backendUrl || !frontendUrl) {
       return res.status(500).json({
-        message: "Backend or frontend URL is missing from environment settings.",
+        message: "Backend or frontend URL is missing.",
       });
     }
 
-    // Calculate the total using prices from the database.
     let totalAmount = 0;
     const orderItems = [];
 
     for (const item of items) {
       if (!mongoose.Types.ObjectId.isValid(item.book)) {
-        return res.status(400).json({
-          message: "Invalid book ID.",
-        });
+        return res.status(400).json({ message: "Invalid book ID." });
       }
 
       const quantity = Number(item.quantity);
 
       if (!Number.isInteger(quantity) || quantity < 1) {
-        return res.status(400).json({
-          message: "Invalid book quantity.",
-        });
+        return res.status(400).json({ message: "Invalid book quantity." });
       }
 
       const book = await Book.findById(item.book);
@@ -201,7 +199,7 @@ const initiatePayment = async (req, res) => {
       });
     }
 
-    // Create an unpaid order first.
+    // Create unpaid order.
     order = await Order.create({
       user: req.user.id,
       items: orderItems,
@@ -221,74 +219,64 @@ const initiatePayment = async (req, res) => {
     order.transactionId = transactionId;
     await order.save();
 
-    // Send payment information to SSLCOMMERZ.
-    const paymentData = new URLSearchParams({
-      store_id: process.env.SSLCOMMERZ_STORE_ID,
-      store_passwd: process.env.SSLCOMMERZ_STORE_PASSWORD,
-      total_amount: totalAmount.toFixed(2),
-      currency: "BDT",
+    // Prepare aamarPay JSON request.
+    const paymentData = {
+      store_id: process.env.AAMARPAY_STORE_ID,
+      signature_key: process.env.AAMARPAY_SIGNATURE_KEY,
       tran_id: transactionId,
-
-      success_url: `${backendUrl}/api/payment/success`,
-      fail_url: `${backendUrl}/api/payment/fail`,
-      cancel_url: `${backendUrl}/api/payment/cancel`,
-      ipn_url: `${backendUrl}/api/payment/ipn`,
-
+      amount: totalAmount.toFixed(2),
+      currency: "BDT",
+      desc: "BookVerse Book Order",
       cus_name: req.user.name || "BookVerse Customer",
       cus_email: req.user.email || "customer@example.com",
+      cus_phone: phone.trim(),
       cus_add1: address.trim(),
       cus_city: city.trim(),
       cus_postcode: postcode.trim(),
       cus_country: "Bangladesh",
-      cus_phone: phone.trim(),
+      success_url: `${backendUrl}/api/payment/success`,
+      fail_url: `${backendUrl}/api/payment/fail`,
+      cancel_url: `${backendUrl}/api/payment/cancel`,
+      type: "json",
+    };
 
-      shipping_method: "NO",
-      product_name: "BookVerse Books",
-      product_category: "Books",
-      product_profile: "general",
+    const response = await fetch(AAMARPAY_PAYMENT_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(paymentData),
     });
-
-    const response = await fetch(
-      "https://sandbox.sslcommerz.com/gwprocess/v4/api.php",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: paymentData,
-      }
-    );
 
     const result = await response.json();
 
     if (
       !response.ok ||
-      result.status !== "SUCCESS" ||
-      !result.GatewayPageURL
+      String(result.result).toLowerCase() !== "true" ||
+      !result.payment_url
     ) {
+      console.error("aamarPay initiation response:", result);
+
       order.paymentStatus = "Failed";
       await order.save();
 
       return res.status(502).json({
         message: "Could not create a payment session.",
-        details: result.failedreason || "Please try again.",
+        details: result.message || result.error || "Please try again.",
       });
     }
 
     return res.status(200).json({
       message: "Payment session created.",
-      paymentUrl: result.GatewayPageURL,
+      paymentUrl: result.payment_url,
       orderId: order._id,
     });
   } catch (error) {
-    console.error("Payment initiation error:", error);
+    console.error("aamarPay initiation error:", error);
 
-    // If an order was created but payment setup failed, mark it failed.
     if (order && order.paymentStatus === "Unpaid") {
       order.paymentStatus = "Failed";
-      await order.save().catch((saveError) => {
-        console.error("Could not update failed order:", saveError);
-      });
+      await order.save().catch(console.error);
     }
 
     return res.status(500).json({
@@ -297,51 +285,46 @@ const initiatePayment = async (req, res) => {
   }
 };
 
-// Handle successful payment callback
+// Handle successful payment callback.
 const paymentSuccess = async (req, res) => {
-  try {
-    const { tran_id, val_id } = req.body;
+  const frontendUrl = process.env.FRONTEND_URL;
 
-    if (!tran_id || !val_id) {
-      return res.redirect(
-        `${process.env.FRONTEND_URL}/payment/failed`
-      );
+  try {
+    const transactionId = req.body.mer_txnid;
+
+    if (!transactionId) {
+      return res.redirect(`${frontendUrl}/payment/failed`);
     }
 
     const order = await Order.findOne({
-      transactionId: tran_id,
+      transactionId,
     });
 
     if (!order) {
-      return res.redirect(
-        `${process.env.FRONTEND_URL}/payment/failed`
-      );
+      return res.redirect(`${frontendUrl}/payment/failed`);
     }
 
-    await validateTransaction(val_id, order);
+    await validateTransaction(transactionId, order);
     await completePaidOrder(order._id);
 
     return res.redirect(
-      `${process.env.FRONTEND_URL}/payment/success?orderId=${order._id}`
+      `${frontendUrl}/payment/success?orderId=${order._id}`
     );
   } catch (error) {
-    console.error("Payment success verification error:", error);
-
-    return res.redirect(
-      `${process.env.FRONTEND_URL}/payment/failed`
-    );
+    console.error("aamarPay success verification error:", error);
+    return res.redirect(`${frontendUrl}/payment/failed`);
   }
 };
 
-// Handle failed payment callback
+// Handle failed payment.
 const paymentFail = async (req, res) => {
   try {
-    const { tran_id } = req.body;
+    const transactionId = req.body.mer_txnid;
 
-    if (tran_id) {
+    if (transactionId) {
       await Order.updateOne(
         {
-          transactionId: tran_id,
+          transactionId,
           paymentStatus: "Unpaid",
         },
         {
@@ -349,28 +332,22 @@ const paymentFail = async (req, res) => {
         }
       );
     }
-
-    return res.redirect(
-      `${process.env.FRONTEND_URL}/payment/failed`
-    );
   } catch (error) {
-    console.error("Payment failure callback error:", error);
-
-    return res.redirect(
-      `${process.env.FRONTEND_URL}/payment/failed`
-    );
+    console.error("aamarPay failure callback error:", error);
   }
+
+  return res.redirect(`${process.env.FRONTEND_URL}/payment/failed`);
 };
 
-// Handle cancelled payment callback
+// Handle cancelled payment.
 const paymentCancel = async (req, res) => {
   try {
-    const { tran_id } = req.body;
+    const transactionId = req.body.mer_txnid;
 
-    if (tran_id) {
+    if (transactionId) {
       await Order.updateOne(
         {
-          transactionId: tran_id,
+          transactionId,
           paymentStatus: "Unpaid",
         },
         {
@@ -378,44 +355,35 @@ const paymentCancel = async (req, res) => {
         }
       );
     }
-
-    return res.redirect(
-      `${process.env.FRONTEND_URL}/payment/cancelled`
-    );
   } catch (error) {
-    console.error("Payment cancellation callback error:", error);
-
-    return res.redirect(
-      `${process.env.FRONTEND_URL}/payment/cancelled`
-    );
+    console.error("aamarPay cancellation callback error:", error);
   }
+
+  return res.redirect(`${process.env.FRONTEND_URL}/payment/cancelled`);
 };
 
-// Handle SSLCOMMERZ Instant Payment Notification
+// Optional notification handler.
 const paymentIPN = async (req, res) => {
   try {
-    const { tran_id, val_id } = req.body;
+    const transactionId = req.body.mer_txnid;
 
-    if (!tran_id || !val_id) {
-      return res.status(400).send("Missing transaction information.");
+    if (!transactionId) {
+      return res.status(400).send("Missing transaction ID.");
     }
 
-    const order = await Order.findOne({
-      transactionId: tran_id,
-    });
+    const order = await Order.findOne({ transactionId });
 
     if (!order) {
       return res.status(404).send("Order not found.");
     }
 
-    await validateTransaction(val_id, order);
+    await validateTransaction(transactionId, order);
     await completePaidOrder(order._id);
 
-    return res.status(200).send("Payment notification processed.");
+    return res.status(200).send("Payment verified.");
   } catch (error) {
-    console.error("Payment IPN error:", error);
-
-    return res.status(400).send("Payment notification could not be verified.");
+    console.error("aamarPay notification error:", error);
+    return res.status(400).send("Payment could not be verified.");
   }
 };
 
